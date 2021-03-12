@@ -35,7 +35,7 @@ type RingBuffer struct {
 	mask      uint32     // capacity - 1
 	len       uint32     // Current size of the Ringbuffer
 	container []*Process // Array container of objects
-	status    []uint32   // Array container of objects operation status
+	status    []uint32   // Array container of objects operation status: readed=0 writed=1
 	reader    uint32     // Reader position 0 - max_uint32
 	writer    uint32     // Writer Position
 }
@@ -77,8 +77,7 @@ func (r *RingBuffer) Put(v *Process) bool {
 			current = current & r.mask // 代替 (current + 1) % r.len 运算
 			i = 0
 			for i < 10 { // wait reading
-				status := atomic.LoadUint32(&r.status[current])
-				if status == 0 {
+				if atomic.LoadUint32(&r.status[current]) == 0 {
 					r.container[current] = v
 					atomic.CompareAndSwapUint32(&r.status[current], 0, 1) // write completed
 					return true
@@ -110,8 +109,7 @@ func (r *RingBuffer) Get() *Process {
 			current := (current & r.mask) // 代替 (current + 1) % r.len 运算
 			i = 0
 			for i < 10 { // wait writing
-				status := atomic.LoadUint32(&r.status[current])
-				if status == 1 {
+				if atomic.LoadUint32(&r.status[current]) == 1 {
 					val := r.container[current]
 					atomic.CompareAndSwapUint32(&r.status[current], 1, 0) // read completed
 					return val
